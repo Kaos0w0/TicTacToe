@@ -121,7 +121,6 @@ def avoid(node, parent, type='returning'):
 # Función que checa los movimientos posibles que puede realizar el bombero
 def checkPossibleMovements(node, directions=['right', 'down', 'left', 'up']):
     movements = []
-    matrix = node.matrix
     x = node.state.currentPos.x
     y = node.state.currentPos.y
     liters = node.state.bucket_state   
@@ -130,10 +129,10 @@ def checkPossibleMovements(node, directions=['right', 'down', 'left', 'up']):
     if node.parent == None: parent = node
     else: parent = node.parent    
 
-    action_up = checkAction(x, y - 1, bucket, liters, matrix)
-    action_down = checkAction(x, y + 1, bucket, liters, matrix)
-    action_left = checkAction(x - 1, y, bucket, liters, matrix)
-    action_right = checkAction(x + 1, y, bucket, liters, matrix)
+    action_up = checkAction(x, y - 1, bucket, liters, map)
+    action_down = checkAction(x, y + 1, bucket, liters, map)
+    action_left = checkAction(x - 1, y, bucket, liters, map)
+    action_right = checkAction(x + 1, y, bucket, liters, map)
     actions = [action_right, action_down, action_left, action_up]
 
     for i in range(0, 4):
@@ -180,8 +179,7 @@ def animate(matrix, state, direction, action=None):
     actual_cell = matrix[y][x]
 
     match past_cell:
-        case 0: past_image = 'ground.png'
-        case 3 | 4: past_image = 'grass.png'
+        case 0 | 2 | 3 | 4: past_image = 'ground.png'
         case 5: past_image = 'start.png'
         case 6: past_image = 'hydrant.png'
 
@@ -212,6 +210,7 @@ def busqueda_amplitud():
     end = False
     expanded_nodes = 0
     fire_number = 0
+    fire_pos = []
 
     for i in range(0,10):
         for j in range(0,10):
@@ -220,10 +219,11 @@ def busqueda_amplitud():
                 pos_y = j
             if map[j][i] == 2:
                 fire_number += 1
+                fire_pos.append((j, i))
 
     pos = Position(pos_x, pos_y)
     state = State(pos, fire_number, 0, 0)
-    node = Node(state, None, None, 0, 0, np.copy(map))    
+    node = Node(state, None, None, 0, 0, 0, fire_pos)    
     
     q = Queue()
     solution = []
@@ -253,7 +253,7 @@ def busqueda_amplitud():
                 text_profundidad.update_text("Tiempo: " + str(time.time() - start_time), (0, 0, 0))
 
                 while actual.parent != None:
-                    operations = [actual.matrix, actual.state.get_state()]
+                    operations = [map, actual.state.get_state()]
                     operations.append(actual.operation.split(' and '))
                     solution.append(operations)
                     actual = actual.parent

@@ -49,13 +49,14 @@ class Text:
         return self.text
     
 class Node: 
-    def __init__(self, state, parent, operation, depth, cost, matrix):
+    def __init__(self, state, parent, operation, depth, cost, heuristic, fire_positions):
         self.state = state
         self.parent = parent
         self.operation = operation
         self.depth = depth
         self.cost = cost
-        self.matrix = matrix
+        self.heuristic = heuristic
+        self.fire_positions = fire_positions
 
     def move(self, direction, action):
         if action != None and action != 'Walk':
@@ -70,7 +71,7 @@ class Node:
             case 'right': next_pos = self.state.currentPos.move_right()
 
         next_state = State(next_pos, self.state.fire_number, self.state.bucket, self.state.bucket_state)
-        node = Node(next_state, self, operation, self.depth + 1, self.cost + 1, np.copy(self.matrix))
+        node = Node(next_state, self, operation, self.depth + 1, self.cost + 1, self.heuristic, self.fire_positions.copy())
         node.apply_action(action)
 
         return node
@@ -78,12 +79,12 @@ class Node:
     def apply_action(node, action):
         match action:
             case 'fill': node.state.fill_bucket()
-            case 'put_out': node.state.put_out_fire()
+            case 'put_out':
+                if((node.state.currentPos.y, node.state.currentPos.x) in node.fire_positions):
+                    node.state.put_out_fire()
+                    node.fire_positions.remove((node.state.currentPos.y, node.state.currentPos.x))
             case 'pick_up_small_bucket': node.state.bucket = 1
             case 'pick_up_big_bucket': node.state.bucket = 2
-
-        if action != 'fill' and action != 'Walk' and action != None:
-            node.matrix[node.state.currentPos.y][node.state.currentPos.x] = 0
 
 class State:
     def __init__(self, currentPos, fire_number, bucket, bucket_state):
