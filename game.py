@@ -1,21 +1,20 @@
+import time
+import mouse
 import pygame
 import numpy as np
-import time as t
-import mouse
-import time
-from classes import Button, Node, Text, State, Position
 from tkinter import Tk
-from tkinter.filedialog import askopenfilename
 from queue import Queue
+from tkinter.filedialog import askopenfilename
+from classes import Button, Node, Text, State, Position
 
 # Setup para pygame
 X = 1280
 Y = 720
 pygame.init()
-screen = pygame.display.set_mode((X, Y))
-clock = pygame.time.Clock()
 running = True
 screen_number = 0
+clock = pygame.time.Clock()
+screen = pygame.display.set_mode((X, Y))
 pygame.display.set_caption('Bombero inteligente')
 
 # Titulo de la ventana
@@ -52,132 +51,117 @@ text_a_estrella = Text('', (X - (X // 4), 425), (0, 0, 0), 25, False)
 informed_list = [text_avara, text_a_estrella]
 informed_list_messages = ['Búsqueda avara', 'Búsqueda A*']
 
-# Imagenes de juego
-fire_image = pygame.image.load('./images/fire.png').convert_alpha()
-ground_image = pygame.image.load('./images/ground.png').convert_alpha()
-hydrant_image = pygame.image.load('./images/hydrant.png').convert_alpha()
-fireman_image = pygame.image.load('./images/fireman.png').convert_alpha()
-bucket_image = pygame.image.load('./images/bucket.png').convert_alpha()
-wall_image = pygame.image.load('./images/wall.png').convert_alpha()
-ashes_image = pygame.image.load('./images/ashes.png').convert_alpha()
-
+# Carpeta donde se encuentran ubicadas las imágenes
 path = "./images/"
 
-def createSquare(x, y, color, image=None):
-    pygame.draw.rect(screen, color, [x, y, cell_width, cell_height ])
+# Funcion de dibuja un cuadrado blanco en la posición (x, y) con la imagen especificada
+# El tamaño del cuadrado está definido por cell_width y cell_height
+def createSquare(x, y, image=None):
+    pygame.draw.rect(screen, (255,255,255), [x, y, cell_width, cell_height ])
     img = pygame.image.load(path + image).convert_alpha()
     screen.blit(img, [x, y, cell_width, cell_height ])
 
+# Función que dibuja la Matriz de juego
 def visualizeGrid():
     y = 125 
     for row in map:
         x = 100
         for item in row:
-            if item == 0:
-                createSquare(x, y, (255, 0, 0), 'ground.png')
-            elif item == 1:
-                createSquare(x, y, (0, 0, 0), 'wall.png')
-            elif item == 2:
-                createSquare(x, y, (0, 0, 0), 'fire.png')
-            elif item == 3:
-                createSquare(x, y, (0, 0, 0), 'bucket1.png')
-            elif item == 4:
-                createSquare(x, y, (0, 0, 0), 'bucket2.png')
-            elif item == 5:
-                createSquare(x, y, (0, 0, 0), 'fireman_start.png')
-            elif item == 6:
-                createSquare(x, y, (0, 0, 0), 'hydrant.png')
-
+            match item:
+                case 0: createSquare(x, y, 'ground.png')
+                case 1: createSquare(x, y, 'wall.png')
+                case 2: createSquare(x, y, 'fire.png')
+                case 3: createSquare(x, y, 'bucket1.png')
+                case 4: createSquare(x, y, 'bucket2.png')
+                case 5: createSquare(x, y, 'fireman_start.png')
+                case 6: createSquare(x, y, 'hydrant.png')
             x += cell_width 
         y += cell_height   
     pygame.display.update()
 
+# Función que deshabilita un texto (lo vuelve 'invisible' y no se puede clickear)
 def disableText(text):
     text.set_clickable()
     text.update_text('', (128, 128, 128))
 
+# Función que habilita un texto (lo vuelve 'visible' y se puede clickear)
 def enableText(text, message):
     text.set_clickable()
     text.update_text(message, (0, 0, 0))
 
+# Función que checa si se puede realizar una acción en una casilla, y en caso de ser así, cual será
+# None = No se puede realizar ninguna acción en esa casilla
 def checkAction(x, y, bucket, liters, mat):
-    if mat[y][x] == 0 or mat[y][x] == 5:
-        return 'Nothing'
-    elif mat[y][x] == 1:
-        return None
-    elif mat[y][x] == 2 and liters == 0:
-        return None
-    elif mat[y][x] == 2 and bucket and liters != 0:
-        return 'put_out'
-    elif mat[y][x] == 3 and not bucket:
-        return 'pick_up_small_bucket'
-    elif mat[y][x] == 3 and bucket:
-        return 'Nothing'
-    elif mat[y][x] == 4 and not bucket:
-        return 'pick_up_big_bucket'
-    elif mat[y][x] == 4 and bucket:
-        return 'Nothing'
-    elif mat[y][x] == 6 and bucket and liters == 0:
-        return 'fill'
-    elif mat[y][x] == 6 and bucket and liters != 0:
-        return 'Nothing'
+    if x <= 9 and y <= 9 and x >= 0 and y >= 0:
+        match mat[y][x]:
+            case 1: return None
+            case 2 if liters == 0: return None
+            case 2 if liters != 0: return 'put_out'
+            case 3 if bucket == False: return 'pick_up_small_bucket'
+            case 4 if bucket == False: return 'pick_up_big_bucket'
+            case 6 if liters == 0 and bucket: return 'fill'
+            case _: return 'Walk'
     else:
-        return 'Nothing'
+        return None
     
+# Función que simula la condición "Evite devolverse al estado anterior" si el tipo es "returning"
+# o la condición "Evite ciclos" si el tipo es "cicles"
+def avoid(node, parent, type='returning'):
+    if type == 'returning':
+        if(node.state.get_state() == parent.state.get_state()): return True
+        return False
     
-def sameState(state1, state2):
-    if(state1.get_state() == state2.get_state()):
-        return True
-    else:
+    elif type == 'cicles':
+        while parent.parent != None:
+            if(node.state.get_state() == parent.state.get_state()):
+                return True
+            parent = parent.parent
         return False
 
-def checkPossibleMovements(node):
+# Función que checa los movimientos posibles que puede realizar el bombero
+def checkPossibleMovements(node, directions=['right', 'down', 'left', 'up']):
     movements = []
+    matrix = node.matrix
     x = node.state.currentPos.x
     y = node.state.currentPos.y
-    liters = node.state.bucket_state
-    if node.state.bucket != 0:
-        bucket = True
-    else:
-        bucket = False
+    liters = node.state.bucket_state   
+    bucket = (node.state.bucket != 0)
     
-    if node.parent == None:
-        parent = node.state
-    else:
-        parent = node.parent.state
+    if node.parent == None: parent = node
+    else: parent = node.parent    
 
-    matrix = node.matrix
+    action_up = checkAction(x, y - 1, bucket, liters, matrix)
+    action_down = checkAction(x, y + 1, bucket, liters, matrix)
+    action_left = checkAction(x - 1, y, bucket, liters, matrix)
+    action_right = checkAction(x + 1, y, bucket, liters, matrix)
+    actions = [action_right, action_down, action_left, action_up]
 
-    if x < 9 and x >= 0 and checkAction(x + 1, y, bucket, liters, matrix)!= None and not sameState(parent, node.move('right', checkAction(x + 1, y, bucket, liters, matrix)).state):
-        movements.append(['right', checkAction(x + 1, y, bucket, liters, matrix)])
-    if y >= 0 and y < 9 and checkAction(x, y + 1, bucket, liters, matrix)!= None and not sameState(parent, node.move('down', checkAction(x, y + 1, bucket, liters, matrix)).state):
-        movements.append(['down', checkAction(x, y + 1, bucket, liters, matrix)])
-    if x > 0 and x <= 9 and checkAction(x - 1, y, bucket, liters, matrix)!= None and not sameState(parent, node.move('left', checkAction(x - 1, y, bucket, liters, matrix)).state):
-        movements.append(['left', checkAction(x - 1, y, bucket, liters, matrix)])
-    if y <= 9 and y > 0 and checkAction(x, y - 1, bucket, liters, matrix)!= None and not sameState(parent, node.move('up', checkAction(x, y - 1, bucket, liters, matrix)).state):
-        movements.append(['up', checkAction(x, y - 1, bucket, liters, matrix)])
+    for i in range(0, 4):
+        if actions[i] != None and not avoid(node.move(directions[i], actions[i]), parent):
+            movements.append([directions[i], actions[i]])
 
     return movements
 
+# Función que dibuja la cubeta (con su respectivo estado) que el bombero tiene en su poder
 def draw_bucket(bucket_number, state):
     empty = pygame.image.load(path + 'empty_bucket.png').convert_alpha()
     full = pygame.image.load(path + 'full_bucket.png').convert_alpha()
-    if bucket_number == 1:
-        if state == 0:
-            screen.blit(empty, [X - (X // 2) - 20, 125, cell_width, cell_height ])
-        else:
-            screen.blit(full, [X - (X // 2) - 20, 125, cell_width, cell_height ])
-    else:
-        if state == 0:
-            screen.blit(empty, [X - (X // 2) - 20, 125, cell_width, cell_height ])
-            screen.blit(empty, [X - (X // 2) - 20, 175, cell_width, cell_height ])
-        elif state == 1:
-            screen.blit(full, [X - (X // 2) - 20, 125, cell_width, cell_height ])
-            screen.blit(empty, [X - (X // 2) - 20, 175, cell_width, cell_height ])
-        elif state == 2:
-            screen.blit(full, [X - (X // 2) - 20, 125, cell_width, cell_height ])
-            screen.blit(full, [X - (X // 2) - 20, 175, cell_width, cell_height ])
 
+    if bucket_number == 1:
+        if state == 0: states = [empty]
+        else: states = [full]
+    else:
+        if state == 0: states = [empty, empty]
+        elif state == 1: states = [empty, full]
+        elif state == 2: states = [full, full]
+
+    separation = 0
+    for image in states:
+        square = [X - (X // 2) - 20, 125 + separation, cell_width, cell_height]
+        screen.blit(image, square)
+        separation += 50
+
+# Función que anima el movimiento del bombero
 def animate(matrix, state, direction, action=None):
     x = state[0][0]
     y = state[0][1]
@@ -186,56 +170,43 @@ def animate(matrix, state, direction, action=None):
     bucket_number = state[2]
     bucket_state = state[3]
 
-    if(direction == 'up'):
-        past_y = y + 1
-    elif(direction == 'down'):
-        past_y = y - 1
-    elif(direction == 'left'):
-        past_x = x + 1
-    elif(direction == 'right'):
-        past_x = x - 1
+    match direction:
+        case 'up': past_y = y + 1
+        case 'down': past_y = y - 1
+        case 'left': past_x = x + 1
+        case 'right': past_x = x - 1        
     
     past_cell = matrix[past_y][past_x]
     actual_cell = matrix[y][x]
 
-    if past_cell == 0:
-        past_image = 'ground.png'
-    elif past_cell == 3 or past_cell == 4:
-        past_image = 'grass.png'
-    elif past_cell == 5:
-        past_image = 'start.png'
-    elif past_cell == 6:
-        past_image = 'hydrant.png'
+    match past_cell:
+        case 0: past_image = 'ground.png'
+        case 3 | 4: past_image = 'grass.png'
+        case 5: past_image = 'start.png'
+        case 6: past_image = 'hydrant.png'
 
-    if action == None:
-        if actual_cell == 0:
+    match action:
+        case None:
+            if actual_cell == 0: actual_image = 'fireman.png'
+            elif actual_cell == 5: actual_image = 'fireman_start.png'
+            elif actual_cell == 6: actual_image = 'fireman_hydrant.png'
+            else: actual_image = 'fireman.png'
+        case 'fill':
+            draw_bucket(bucket_number, bucket_state)
+            actual_image = 'fireman_fill.png'
+        case 'put_out':
+            draw_bucket(bucket_number, bucket_state)
+            actual_image = 'fireman_ashes.png'
+        case 'pick_up_small_bucket' | 'pick_up_big_bucket':
+            draw_bucket(bucket_number, bucket_state)
             actual_image = 'fireman.png'
-        elif actual_cell == 5:
-            actual_image = 'fireman_start.png'
-        elif actual_cell == 6:
-            actual_image = 'fireman_hydrant.png'
-        else:
-            actual_image = 'fireman.png'
-    elif action == 'fill':
-        draw_bucket(bucket_number, bucket_state)
-        actual_image = 'fireman_fill.png'
-    elif action == 'put_out':
-        draw_bucket(bucket_number, bucket_state)
-        actual_image = 'fireman_ashes.png'
-    elif action == 'pick_up_small_bucket':
-        draw_bucket(bucket_number, bucket_state)
-        actual_image = 'fireman.png'
-    elif action == 'pick_up_big_bucket':
-        draw_bucket(bucket_number, bucket_state)
-        actual_image = 'fireman.png'
-    else:
-        actual_image = 'ground.png'
+        case _: actual_image = 'ground.png'
 
-    createSquare(100 + (50 * past_x), 125 + (50 * past_y), (255, 0, 0), past_image)
-    createSquare(100 + (50 * x), 125 + (50 * y), (255, 0, 0), actual_image)
-        
+    createSquare(100 + (50 * past_x), 125 + (50 * past_y), past_image)
+    createSquare(100 + (50 * x), 125 + (50 * y), actual_image)
     pygame.display.update()
 
+# Función que realiza la busqueda por amplitud
 def busqueda_amplitud():
     start_time = time.time()
     end = False
@@ -293,12 +264,14 @@ def busqueda_amplitud():
                         animate(elem[0], elem[1], elem[2][0])
                     else:
                         animate(elem[0], elem[1], elem[2][0], elem[2][1])
-                    t.sleep(1.5) 
+                    time.sleep(1.5) 
 
             else:
                 movements = checkPossibleMovements(actual)
                 for movement in movements:
                     q.put(actual.move(movement[0], movement[1]))
+
+# Código que se ejecuta mientras la ventana de pygame siga abierta
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:

@@ -56,42 +56,34 @@ class Node:
         self.depth = depth
         self.cost = cost
         self.matrix = matrix
+
     def move(self, direction, action):
-
-        if action != None and action != 'Nothing':
-            complement = ' and ' + action
+        if action != None and action != 'Walk':
+            operation = direction + ' and ' + action
         else:
-            complement = ''
+            operation = direction
 
-        if direction == 'up':
-            node = Node(State(self.state.currentPos.move_up(), self.state.fire_number, self.state.bucket, self.state.bucket_state), self, 'up'+complement, self.depth + 1, self.cost + self.state.bucket_state + 1, np.copy(self.matrix))
-            node.apply_action(action)
-            return node
-        elif direction == 'down':
-            node = Node(State(self.state.currentPos.move_down(), self.state.fire_number, self.state.bucket, self.state.bucket_state), self, 'down'+complement, self.depth + 1, self.cost + self.state.bucket_state + 1, np.copy(self.matrix))
-            node.apply_action(action)
-            return node
-        elif direction == 'left':
-            node = Node(State(self.state.currentPos.move_left(), self.state.fire_number, self.state.bucket, self.state.bucket_state), self, 'left'+complement, self.depth + 1, self.cost + self.state.bucket_state + 1, np.copy(self.matrix))
-            node.apply_action(action)
-            return node
-        elif direction == 'right':
-            node = Node(State(self.state.currentPos.move_right(), self.state.fire_number, self.state.bucket, self.state.bucket_state), self, 'right'+complement, self.depth + 1, self.cost + self.state.bucket_state + 1, np.copy(self.matrix))
-            node.apply_action(action)
-            return node
+        match direction:
+            case 'up': next_pos = self.state.currentPos.move_up()
+            case 'down': next_pos = self.state.currentPos.move_down()
+            case 'left': next_pos = self.state.currentPos.move_left()
+            case 'right': next_pos = self.state.currentPos.move_right()
+
+        next_state = State(next_pos, self.state.fire_number, self.state.bucket, self.state.bucket_state)
+        node = Node(next_state, self, operation, self.depth + 1, self.cost + 1, np.copy(self.matrix))
+        node.apply_action(action)
+
+        return node
+
     def apply_action(node, action):
-        if action == 'fill':
-            node.state.fill_bucket()
-        elif action == 'put_out':
-            node.matrix[node.state.currentPos.y][node.state.currentPos.x] = 0
-            node.state.put_out_fire()
-        elif action == 'pick_up_small_bucket':
-            node.matrix[node.state.currentPos.y][node.state.currentPos.x] = 0
-            node.state.bucket = 1
-        elif action == 'pick_up_big_bucket':
-            node.matrix[node.state.currentPos.y][node.state.currentPos.x] = 0
-            node.state.bucket = 2
+        match action:
+            case 'fill': node.state.fill_bucket()
+            case 'put_out': node.state.put_out_fire()
+            case 'pick_up_small_bucket': node.state.bucket = 1
+            case 'pick_up_big_bucket': node.state.bucket = 2
 
+        if action != 'fill' and action != 'Walk' and action != None:
+            node.matrix[node.state.currentPos.y][node.state.currentPos.x] = 0
 
 class State:
     def __init__(self, currentPos, fire_number, bucket, bucket_state):
