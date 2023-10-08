@@ -8,14 +8,17 @@ class Button:
         self.rect = pygame.Rect(rect)
         self.image = pygame.Surface(self.rect.size)
         self.image.fill(self.color)
+        self.active = True
     def render(self, screen):
         screen.blit(self.image, self.rect)
     def get_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.active:
             if self.rect.collidepoint(pygame.mouse.get_pos()):
                 return True
     def get_rect(self):
         return self.rect
+    def set_active(self):
+        self.active = not self.active
 
 # Definicion de una clase para el texto
 class Text:
@@ -49,66 +52,28 @@ class Text:
         return self.text
     
 class Node: 
-    def __init__(self, state, parent, operation, depth, cost, heuristic, fire_positions):
-        self.state = state
+    def __init__(self, matrix, player, parent, best_movement, depth = 0, utility = 0):
+        self.matrix = matrix
+        self.player = player
         self.parent = parent
-        self.operation = operation
+        self.best_movement = best_movement
         self.depth = depth
-        self.cost = cost
-        self.heuristic = heuristic
-        self.fire_positions = fire_positions
-
-    def move(self, direction, action):
-        if action != None and action != 'Walk':
-            operation = direction + ' and ' + action
-        else:
-            operation = direction
-
-        match direction:
-            case 'up': next_pos = self.state.currentPos.move_up()
-            case 'down': next_pos = self.state.currentPos.move_down()
-            case 'left': next_pos = self.state.currentPos.move_left()
-            case 'right': next_pos = self.state.currentPos.move_right()
-
-        next_state = State(next_pos, self.state.fire_number, self.state.bucket, self.state.bucket_state)
-        node = Node(next_state, self, operation, self.depth + 1, self.cost + 1, self.heuristic, self.fire_positions.copy())
-        node.apply_action(action)
-
-        return node
-
-    def apply_action(node, action):
-        match action:
-            case 'fill': node.state.fill_bucket()
-            case 'put_out':
-                if((node.state.currentPos.y, node.state.currentPos.x) in node.fire_positions):
-                    node.state.put_out_fire()
-                    node.fire_positions.remove((node.state.currentPos.y, node.state.currentPos.x))
-            case 'pick_up_small_bucket': node.state.bucket = 1
-            case 'pick_up_big_bucket': node.state.bucket = 2
-
-class State:
-    def __init__(self, currentPos, fire_number, bucket, bucket_state):
-        self.currentPos = currentPos
-        self.fire_number = fire_number
-        self.bucket = bucket
-        self.bucket_state = bucket_state
-    def get_state(self):
-        return ((self.currentPos.x, self.currentPos.y), self.fire_number, self.bucket, self.bucket_state)
-    def put_out_fire(self):
-        self.fire_number -= 1
-        self.bucket_state -= 1
-    def fill_bucket(self):
-        self.bucket_state = self.bucket
-
-class Position:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-    def move_up(self):
-        return Position(self.x, self.y - 1)
-    def move_down(self):
-        return Position(self.x, self.y + 1)
-    def move_left(self):
-        return Position(self.x - 1, self.y)
-    def move_right(self):
-        return Position(self.x + 1, self.y)
+        self.utility = utility
+    def get_matrix(self):
+        return self.matrix
+    def get_player(self):
+        return self.player
+    def get_parent(self):
+        return self.parent
+    def get_best_movement(self):
+        return self.best_movement
+    def get_depth(self):
+        return self.depth
+    def get_utility(self):
+        return self.utility
+    def set_player(self, player):
+        self.player = player
+    def set_utility(self, utility):
+        self.utility = utility
+    def set_best_movement(self, best_movement):
+        self.best_movement = best_movement
